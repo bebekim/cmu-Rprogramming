@@ -1,0 +1,593 @@
+---
+title: Lecture 8 - 2x2 Tables, ANOVA, and Linear Regression
+author: 94-842
+date: February 9, 2017
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+---
+
+###Agenda
+
+- 2x2 tables, j x k tables
+
+- ANOVA
+
+- Linear regression 
+    - Fitting linear regression models in R
+    - Diagnostic plots
+    - Interpreting regression coefficients
+    - Testing significance of factor variables
+
+Let's begin by loading the packages we'll need to get started
+```{r}
+library(MASS)
+library(plyr) 
+library(ggplot2)
+library(knitr)
+```
+
+```{r}
+# Rename the columns to have more descriptive names
+colnames(birthwt) <- c("birthwt.below.2500", "mother.age", "mother.weight", 
+    "race", "mother.smokes", "previous.prem.labor", "hypertension", "uterine.irr", 
+    "physician.visits", "birthwt.grams")
+
+# Transform variables to factors with descriptive levels
+birthwt <- transform(birthwt, 
+            race = as.factor(mapvalues(race, c(1, 2, 3), 
+                              c("white","black", "other"))),
+            mother.smokes = as.factor(mapvalues(mother.smokes, 
+                              c(0,1), c("no", "yes"))),
+            hypertension = as.factor(mapvalues(hypertension, 
+                              c(0,1), c("no", "yes"))),
+            uterine.irr = as.factor(mapvalues(uterine.irr, 
+                              c(0,1), c("no", "yes")))
+            )
+```
+
+### Is the data normal?
+
+I would recommend using a non-parametric test when the data appears highly non-normal and the sample size is small.  If you really want to stick to t-testing, it's good to know how to diagnose non-normality.  
+
+#### qq-plot
+
+The simplest thing to look at is a normal qq plot of the data.  This is obtained using the `qqnorm()` function.
+
+
+```{r, fig.align='center', fig.width = 5, fig.height = 4}
+# qq plot
+with(birthwt, qqnorm(birthwt.grams[mother.smokes=="no"]))
+# add reference line
+with(birthwt, qqline(birthwt.grams[mother.smokes=="no"], col = "blue"))
+
+# qq plot
+with(birthwt, qqnorm(birthwt.grams[mother.smokes=="yes"]))
+# add reference line
+with(birthwt, qqline(birthwt.grams[mother.smokes=="yes"], col = "blue"))
+
+# qq plot
+x <- rnorm(115); qqnorm(x); qqline(x)
+```
+
+If the data are exactly normal, you expect the points to lie on a straight line.  The data we have here are pretty close to lying on a line.  
+
+Here's what we would see if the data were right-skewed
+
+```{r, fig.align='center', fig.width = 5, fig.height = 4}
+set.seed(12345)
+fake.data <- rexp(200)
+qqnorm(fake.data)
+qqline(fake.data, col = "blue") # add line
+```
+
+If you construct a qqplot and it looks like this, you should be carefully, particularly if your sample size is small.
+
+
+### Tests for 2x2 tables
+
+Here's an example of a 2 x 2 table that we might want to run a test on.  This one looks at low birthweight broken down by mother's smoking status.  You can think of it as another approach to the t-test problem, this time looking at indicators of low birth weight instead of the actual weights.
+
+First, let's build our table using the `table()` function (we did this back in Lecture 5)
+```{r}
+weight.smoke.tbl <- with(birthwt, table(birthwt.below.2500, mother.smokes))
+weight.smoke.tbl
+```
+
+We also previously calculated the odds ratio for this table, finding that it was approximately 2.  This indicated that the odds of low birthweight double when the mother smokes.
+
+To test for significance, we just need to pass our 2 x 2 table into the appropriate function.  Here's the result of using fisher's exact test by calling `fisher.test`
+
+```{r}
+birthwt.fisher.test <- fisher.test(weight.smoke.tbl)
+birthwt.fisher.test
+attributes(birthwt.fisher.test)
+```
+
+As when using the t-test, we find that there is a significant association between smoking an low birth weight.
+
+**Interpretation**:  The odds of low birth weight are `r  round(birthwt.fisher.test$estimate, 2)` times greater when the mother smokes than when the mother does not smoke.
+
+You can also use the chi-squared test via the `chisq.test` function.  This is the test that you may be more familiar with from your statistics class.
+
+```{r}
+chisq.test(weight.smoke.tbl)
+```
+
+You get essentially the same answer by running the chi-squared test, but the output isn't as useful.  In particular, you're not getting an estimate or confidence interval for the odds ratio.  This is why I prefer `fisher.exact()` for testing 2 x 2 tables.
+
+#### Tests for j x k tables
+
+Here's a small data set on party affiliation broken down by gender.
+
+```{r}
+# Manually enter the data
+politics <- as.table(rbind(c(762, 327, 468), c(484, 239, 477)))
+dimnames(politics) <- list(gender = c("F", "M"),
+                    party = c("Democrat","Independent", "Republican"))
+
+politics # display the data
+```
+
+We may be interested in asking whether men and women have different party affiliations.  
+
+The answer will be easier to guess at if we convert the rows to show proportions instead of counts.  Here's one way of doing this.
+
+```{r}
+politics.prop <- apply(politics, 1, FUN = function(x) {x / sum(x)})
+politics.prop
+colSums(politics.prop) # Check that columns sum to 1
+politics.prop <- t(politics.prop) # Transpose the table
+
+# Fix dimnames
+dimnames(politics.prop) <- list(gender = c("F", "M"),
+                    party = c("Democrat","Independent", "Republican"))
+
+# Output
+politics.prop
+```
+
+By looking at the table we see that Female are more likely to be Democrats and less likely to be Republicans. 
+
+We still want to know if this difference is significant.  To assess this we can use the chi-squared test (on the counts table, not the proportions table!).
+
+```{r}
+chisq.test(politics)
+```
+
+There isn't really a good one-number summary for general $j$ x $k$ tables the way there is for 2 x 2 tables.  One thing that we may want to do at this stage is to ignore the Independent category and just look at the 2 x 2 table showing the counts for the Democrat and Republican categories.
+
+```{r}
+politics.dem.rep <- politics[,c(1,3)]
+politics.dem.rep
+
+# Run Fisher's exact test
+fisher.test(politics.dem.rep)
+```
+
+We see that women have significantly higher odds of being Democrat compared to men. 
+
+### Plotting the table values with confidence
+
+It may be useful to represent the data graphically.  Here's one way of doing so with the `ggplot2` package.  Note that we plot the **proportions** not the counts.  
+
+**1.** Convert the table into something ggplot2 can process by using `melt()` from the `reshape` package.
+```{r}
+library(reshape)
+politics.prop
+politics.melt <- melt(politics.prop, id=c("gender","party"))
+politics.melt
+```
+
+**2.** Create a ggplot2 object, and plot with `geom_barplot()`
+
+```{r, fig.align='center', fig.height=4, fig.width=6}
+ggplot(politics.melt, aes(x=party, y=value, fill=gender)) + geom_bar(position="dodge", stat="identity")
+```
+
+This figure is a nice alternative to displaying a table.  One thing we might want to add is a way of gauging the statistical significance of the differences in height.  We'll do so by adding error bars.  
+
+#### Adding error bars to bar plots
+
+Remember, ggplot wants everything you plot to be sitting nicely in a data frame. Here's some code that will calculate the relevant values and do the plotting.
+
+**1.** Get the data into a form that's easy to work with.
+
+```{r}
+# Form into a long data frame
+politics.count.melt <- melt(politics, id=c("gender", "party"))
+# print
+politics.count.melt
+
+# Add a column of marginal counts
+politics.count.melt <- transform(politics.count.melt, totals = rowSums(politics)[gender])
+# print 
+politics.count.melt
+```
+
+**2.** Calculate confidence intervals.
+
+To calculate confidence intervals for the proportions, we can use `prop.test` or `binom.test`.  Essentially you call these functions the numerator and denominator for the proportion.
+
+We'll do this in a for loop.
+
+```{r}
+# define list of prop, and lower and upper endpoints
+conf.ints <- list(prop = NULL, lower = NULL, upper = NULL)
+for(i in 1:nrow(politics.count.melt)) {
+  numerator <- politics.count.melt$value[i]
+  denominator <- politics.count.melt$totals[i]
+  prop.test.out <- prop.test(numerator, denominator)
+  
+  # Add estimate of proportion to list
+  conf.ints[["prop"]][i] <- prop.test.out$estimate
+  # Grab confidence interval
+  interval <- prop.test.out$conf.int
+  # Add estimate and endpoints to conf.ints list
+  conf.ints[["lower"]][i] <- interval[1]
+  conf.ints[["upper"]][i] <- interval[2]
+}
+conf.ints
+```
+
+**3.** Combine the confidence intervals into the data frame
+
+```{r}
+politics.toplot <- cbind(politics.count.melt, conf.ints)
+politics.toplot
+```
+
+**4.** Use `ggplot()`, `geom_bar()` and `geom_errorbar()` to construct the plots
+
+```{r, fig.align='center'}
+ggplot(politics.toplot, aes(x=party, y=prop, fill=gender)) + 
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=lower, ymax=upper), 
+                width=.2,                    # Width of the error bars
+                position=position_dodge(0.9))
+```
+
+### ANOVA
+
+You can think of ANOVA (analysis of variance) as a more general version of the t-test, or a special case of linear regression in which all covariates are factors.  
+
+Let's go back to our favourite birthwt data set from the MASS library.
+
+#### One-way ANOVA example
+
+**Question: Is there a significant association between race and birthweight?**
+
+Here's a table showing the mean and standard error of birthweight by race.
+
+```{r}
+aggregate(birthwt.grams ~ race, data = birthwt, FUN = mean)
+```
+
+It looks like there's some association, but we don't yet know if it's statistically significant.  Note that if we had just two racial categories in our data, we could run a t-test.  Since we have more than 2, we need to run a 1-way analysis of variance (ANOVA). 
+
+**Terminology**: a $k$-way ANOVA is used to assess whether the mean of an outcome variable is constant across all combinations of $k$ factors.  The most common examples are 1-way ANOVA (looking at a single factor), and 2-way ANOVA (looking at two factors).
+
+We'll use the `aov()` function.  For convenience, `aov()` allows you to specify a formula.
+```{r}
+summary(aov(birthwt.grams ~ race, data = birthwt))
+```
+
+The p-value is significant at the 0.05 level, so the data suggests that there is an association between birthweight and race.  In other words, average birthweight varies across the three racial groups considered in the data.
+
+
+### Linear regression
+
+Linear regression is just a more general form of ANOVA.  It allows you to model effects of continuous variables. 
+
+> **linear regression** is used to model linear relationship between an outcome variable, $y$, and a set of *covariates* or *predictor variables* $x_1, x_2, \ldots, x_p$. 
+
+For our first example we'll look at a small data set in which we're interested in predicting the crime rate per million population based on socio-economic and demographic information at the state level.  
+
+Let's first import the data set and see what we're working with.
+
+```{r}
+# Import data set
+crime <- read.table("http://www.andrew.cmu.edu/user/achoulde/94842/data/crime_simple.txt", sep = "\t", header = TRUE)
+```
+
+**The variable names that this data set comes with are very confusing, and even misleading.**
+
+R: Crime rate: # of offenses reported to police per million population
+
+Age: The number of males of age 14-24 per 1000 population
+
+S: Indicator variable for Southern states (0 = No, 1 = Yes)
+
+Ed: Mean # of years of schooling x 10 for persons of age 25 or older
+
+Ex0: 1960 per capita expenditure on police by state and local government
+
+Ex1: 1959 per capita expenditure on police by state and local government
+
+LF: Labor force participation rate per 1000 civilian urban males age 14-24
+
+M: The number of males per 1000 females
+
+N: State population size in hundred thousands
+
+NW: The number of non-whites per 1000 population
+
+U1: Unemployment rate of urban males per 1000 of age 14-24
+
+U2: Unemployment rate of urban males per 1000 of age 35-39
+
+W: Median value of transferable goods and assets or family income in tens of $
+
+X: The number of families per 1000 earning below 1/2 the median income
+
+**We really need to give these variables better names**
+
+
+```{r}
+# Assign more meaningful variable names
+colnames(crime) <- c("crime.per.million", "young.males", "is.south", "average.ed",
+                     "exp.per.cap.1960", "exp.per.cap.1959", "labour.part",
+                     "male.per.fem", "population", "nonwhite",
+                     "unemp.youth", "unemp.adult", "median.assets", "num.low.salary")
+
+# Convert is.south to a factor
+# Divide average.ed by 10 so that the variable is actually average education
+# Convert median assets to 1000's of dollars instead of 10's
+crime <- transform(crime, is.south = as.factor(is.south),
+                          average.ed = average.ed / 10,
+                          median.assets = median.assets / 100)
+
+# print summary of the data
+summary(crime)
+```
+
+#### First step: some plotting and summary statistics
+
+You can start by feeding everything into a regression, but it's often a better idea to construct some simple plots (e.g., scatterplots and boxplots) and summary statistics to get some sense of how the data behaves.
+
+```{r, fig.align='center', fig.height=4, fig.width=5}
+# Scatter plot of outcome (crime.per.million) against average.ed
+qplot(average.ed, crime.per.million, data = crime)
+# correlation between education and crime
+with(crime, cor(average.ed, crime.per.million))
+```
+
+This seems to suggest that higher levels of average education are associated with higher crime rates.  *Can you come up with an explanation for this phenomenon?*
+
+```{r, fig.align='center', fig.height=4, fig.width=5}
+# Scatter plot of outcome (crime.per.million) against median.assets
+qplot(median.assets, crime.per.million, data = crime)
+# correlation between education and crime
+with(crime, cor(median.assets, crime.per.million))
+```
+
+There also appears to be a positive association between median assets and crime rates.
+
+```{r, fig.align='center', fig.height=5, fig.width=5}
+# Boxplots showing crime rate broken down by southern vs non-southern state
+qplot(is.south, crime.per.million, geom = "boxplot", data = crime)
+```
+
+#### Constructing a regression model
+
+To construct a linear regression model in R, we use the `lm()` function.  You can specify the regression model in various ways.  The simplest is often to use the formula specification.
+
+The first model we fit is a regression of the outcome (`crimes.per.million`) against all the other variables in the data set.  You can either white out all the variable names. or use the shorthand `y ~ .` to specify that you want to include all the variables in your regression.
+
+```{r}
+crime.lm <- lm(crime.per.million ~ ., data = crime)
+# Summary of the linear regression model
+crime.lm
+summary(crime.lm)
+```
+
+R's default is to output values in scientific notation.  This can make it hard to interpret the numbers.  Here's some code that can be used to force full printout of numbers.
+
+```{r}
+options(scipen=4)  # Set scipen = 0 to get back to default
+```
+
+```{r}
+summary(crime.lm)
+```
+
+```{r}
+# Nicer print-out
+kable(summary(crime.lm)$coef, digits = c(3, 3, 3, 4))
+```
+
+Looking at the p-values, it looks like `num.low.salary` (number of families per 1000 earning below 1/2 the median income), `unemp.adult` (Unemployment rate of urban males per 1000 of age 35-39), `average.ed` (Mean # of years of schooling 25 or older), and `young.males` (number of males of age 14-24 per 1000 population) are all statistically significant predictors of crime rate.  
+
+The coefficients for these predictors are all positive, so crime rates are positively associated with wealth distribution, adult unemployment rates, average education levels, and high rates of young males in the population.  
+
+##### Exploring the lm object
+
+What kind of output do we get when we run a linear model (`lm`) in R?
+
+```{r}
+# List all attributes of the linear model
+attributes(crime.lm)
+
+# coefficients
+crime.lm$coef
+```
+
+None of the attributes seem to give you p-values.  Here's what you can do to get a table that allows you to extract p-values. 
+
+```{r}
+# Pull coefficients element from summary(lm) object
+round(summary(crime.lm)$coef, 3)
+```
+
+If you want a particular p-value, you can get it by doing the following
+
+```{r}
+# Pull the coefficients table from summary(lm)
+crime.lm.coef <- round(summary(crime.lm)$coef, 3)
+# See what this gives
+class(crime.lm.coef)
+attributes(crime.lm.coef)
+crime.lm.coef["average.ed","Pr(>|t|)"]
+```
+
+The coefficients table is a matrix with named rows and columns.  You can therefore access particular cells either by numeric index, or by name (as in the example above).
+
+##### Plotting the lm object
+
+```{r, fig.align='center', fig.height=4.5, fig.width=6, cache=TRUE}
+plot(crime.lm)
+```
+
+These four plots are important diagnostic tools in assessing whether the linear model is appropriate.  The first two plots are the most important, but the last two can also help with identifying outliers and non-linearities.  
+
+**Residuals vs. Fitted** When a linear model is appropriate, we expect 
+
+1. the residuals will have constant variance when plotted against fitted values; and 
+
+2. the residuals and fitted values will be uncorrelated.  
+  
+If there are clear trends in the residual plot, or the plot looks like a funnel, these are clear indicators that the given linear model is inappropriate.
+
+**Normal QQ plot** You can use a linear model for prediction even if the underlying normality assumptions don't hold.  However, in order for the p-values to be believable, the residuals from the regression must look approximately normally distributed.  
+
+**Scale-location plot** This is another version of the residuals vs fitted plot.  There should be no discernible trends in this plot.
+
+**Residuals vs Leverage**.  Leverage is a measure of how much an observation influenced the model fit.  It's a one-number summary of how different the model fit would be if the given observation was excluded, compared to the model fit where the observation is included.  Points with *high residual* (poorly described by the model) and *high leverage* (high influence on model fit) are outliers.  They're skewing the model fit away from the rest of the data, and don't really seem to fit with the rest of the data.
+
+##### Collinearity and pairs plots
+
+In your regression class you probably learned that **collinearity** can throw off the coefficient estimates.  To diagnose collinearity, we can do a plot matrix.  In base graphics, this can be accomplished via the `pairs` function.
+
+As a demo, let's look at some of the economic indicators in our data set.
+
+```{r}
+economic.var.names <- c("exp.per.cap.1959", "exp.per.cap.1960", "unemp.adult", "unemp.youth", "labour.part", "median.assets")
+pairs(crime[,economic.var.names])
+round(cor(crime[,economic.var.names]), 3)
+```
+
+Since the above-diagonal and below-diagonal plots contain essentially the same information, it's often more useful to display some other values in one of the spaces.  In the example below, we use the panel.cor function from the `pairs()` documentation to add text below the diagonal.
+
+```{r}
+# Function taken from ?pairs Example section.  
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = pmax(1, cex.cor * r))
+}
+
+# Use panel.cor to display correlations in lower panel.
+pairs(crime[,economic.var.names], lower.panel = panel.cor)
+```
+
+Looking at the plot, we see that many of the variables are very strongly correlated.  In particular, police expenditures are pretty much identical in 1959 and 1960.  This is an extreme case of collinearity.  Also, unsurprisingly, youth unemployment and adult unemployment are also highly correlated.  
+
+Let's just include the 1960 police expenditure variable, and also drop the young unemployment variable.  We'll do this using the `update()` function.  Here's what happens.
+
+```{r}
+crime.lm.2 <- update(crime.lm, . ~ . - exp.per.cap.1959 - unemp.youth)
+summary(crime.lm.2)
+crime.lm.summary.2 <- summary(crime.lm.2)
+```
+
+When outputting regression results, it's always good to use the `kable()` function to make things look a little nicer.
+
+```{r, results = 'asis'}
+kable(round(crime.lm.summary.2$coef, 3), format = 'markdown')
+```
+
+##### Thinking more critically about the linear model
+
+We see that `exp.per.cap.1960` is now highly significant.  
+```{r}
+crime.lm.summary.2$coef["exp.per.cap.1960",]
+```
+
+This is interesting.  It's essentially saying that, all else being equal, every dollar per capita increase in police expenditure is on average associated with an increase in crime of 1.13 per million population.  
+
+```{r}
+crime.lm.summary.2$coef["average.ed",]
+```
+
+Also, for every unit increase in average education, we find that the number of reported crimes increases by about 15.3 per million.  
+
+One of my main reasons for selecting this data set is that it illustrates some of the more common pitfalls in interpreting regression models.  
+
+**Just because a coefficient is significant, doesn't mean your covariate causes your response**
+
+- This is the old adage that correlation does not imply causation.  In this example, we have strong evidence that higher police expenditures are positively associated with crime rates.  This doesn't mean that decreasing police expenditure will lower crime rate.  The relationship is not causal -- at least not in that direction.  A more reasonable explanation is that higher crime rates promt policy makers to increase police expenditure.
+
+**There's a difference between practical significance and statistical significance**
+
+- Both `average.ed` and `exp.per.cap.1960` are statistically significant.  `exp.per.cap.1960` has a much more significant p-value, but also a much smaller coefficient.  When looking at your regression model, you shouldn't just look at the p-value column.  The really interesting covariates are the ones that are significant, but also have the largest effect.  
+
+
+### Factors in linear regression
+
+#### Interpreting coefficients of factor variables
+
+For categorical variables, the interpretation is relative to the given baseline.  To understand what this means, let's go back to the birthwt data and try regressing birthweight on race, mother's smoking status, and mother's age. 
+
+```{r}
+# Fit regression model
+birthwt.lm <- lm(birthwt.grams ~ race + mother.smokes + mother.age, data = birthwt)
+
+# Regression model summary
+summary(birthwt.lm)
+```
+
+Observe that while there are `r nlevels(birthwt$race)` levels in the `race` variable, there are only two coefficents estimated: one called `raceother` and the other called `racewhite`.  
+
+**Why is one of the levels missing in the regression?:**  These coefficients represent difference from the **baseline** level.  The baseline level is the one coded as `1`.  By default, it's the level that comes first in the alphabet (here, `black`).  The first level is essentially pulled into the intercept term, so we don't see it explicitly.  
+
+**Interpretation of the coefficients**:  The baseline level for `race` is `black`.  Thus we see that, once we control for mother's smoking status and age, babies of white mothers tend to weigh on average `r round(coef(birthwt.lm)["racewhite"], 1)`g more than those of black mothers.  Babies whose mothers are non-white and non-black on average weigh `r round(abs(coef(birthwt.lm)["raceother"]), 1)`g less than those of black mothers. 
+
+**Note** the numbers in the above paragraph come from inline code chunks.  Here's the syntax for grabbing & rounding the coefficients of race.
+
+```{r}
+# white
+round(coef(birthwt.lm)["racewhite"], 1)
+
+# other
+round(coef(birthwt.lm)["raceother"], 1)
+```
+
+#### Assessing significance of factors in regression
+
+When dealing with multi-level factors, significance is assessed by considering dropping the entire factor from the regression.  You can therefore wind up in a situation where a factor is significant even when none of the individual estimated coefficients are on their own significant.  
+
+To run this kind of test, we'll use the `anova()` function and specify two models, one of which is nested in the other.
+
+Here's how we can test whether `race` is a significant predictor of birth weight even after we control for mother's age and smoking status.
+
+```{r}
+# Check if including the race variable significantly improves model fit
+anova(update(birthwt.lm, . ~ . - race), birthwt.lm, test = "Chisq")
+```
+
+This returns a p-value based on a Chi-square variable with degrees of freedom = (# levels in factor - 1)
+
+The test is highly significant, so race is indeed a significant predictor of birthweight.  
+
+```{r, echo = FALSE, eval = FALSE}
+birthwt.lm.plot <- lm(birthwt.grams ~ race  + mother.age, data = birthwt)
+# Calculate race-specific intercepts
+intercepts <- c(coef(birthwt.lm.plot)["(Intercept)"],
+                coef(birthwt.lm.plot)["(Intercept)"] + coef(birthwt.lm.plot)["raceother"],
+                coef(birthwt.lm.plot)["(Intercept)"] + coef(birthwt.lm.plot)["racewhite"])
+
+lines.df <- data.frame(intercepts = intercepts,
+                       slopes = rep(coef(birthwt.lm.plot)["mother.age"], 3),
+                       race = levels(birthwt$race))
+
+qplot(x = mother.age, y = birthwt.grams, color = race, data = birthwt) + 
+  geom_abline(aes(intercept = intercepts, 
+                  slope = slopes, 
+                  color = race), data = lines.df)
+```

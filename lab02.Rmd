@@ -1,0 +1,63 @@
+---
+title: "Lab 2"
+author: "Your Name Here"
+output: html_document
+---
+
+#### 1. Changing the author field and file name.
+
+##### (a) Change the `author:` field on the Rmd document from Your Name Here to your own name.
+
+##### (b) Rename this file to "lab02_YourHameHere.Rmd", where YourNameHere is changed to your own name.
+
+#### 2. Data practice
+
+In class we imported the survey data using the `read.table()` function.  (Note: on Homework 1 you'll be asked to use the `read.csv()` function instead.)
+
+This is the code we used:
+
+```{r}
+survey <- read.table("http://www.andrew.cmu.edu/user/achoulde/94842/data/survey_data.csv", header=TRUE, sep=",") 
+```
+
+##### (a) How many survey respondents are from MISM or Other?
+
+```{r}
+# Edit me
+```
+
+##### (b) What % of survey respondents are from PPM?
+
+```{r}
+# Edit me
+```
+
+#### 3. Index practice
+
+##### (a) Use $ notation to pull the OperatingSystem column from the survey data
+
+```{r}
+# Edit me
+```
+
+##### (b) Do the same thing with [,] notation, referring to OperatingSystem by name
+
+```{r}
+# Edit me
+```
+
+##### (c) Repeat part (b), this time referring to OperatingSystem by column number
+
+```{r}
+# Edit me
+```
+
+#### 4. Optional practice
+
+Try re-running as much of the lecture code as you have time for, taking time to understand what is happening in each line of code.  You can enter the code directly into the Console.  (Optional: you may enter your code in the code chunk below.)
+
+**Tip:** Instead of copying and pasting code, practice typing it yourself.  This will help you to learn the syntax.
+
+```{r}
+# Edit me (optional)
+```

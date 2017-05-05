@@ -1,0 +1,371 @@
+---
+title: Lecture 2 - Importing data and more basics
+author: Prof. Alexandra Chouldechova
+date: January 19, 2017
+font-family: Gill Sans
+---
+
+
+###Agenda
+
+- Wrapping up vector indexing
+
+- Importing data
+
+- Simple summaries of categorical and continuous data
+
+- Coding style
+
+- Homework 1 assigned, grading rubric
+
+- Lab 2
+
+###Wrapping up vector indexing
+
+Let's go back to where we left off in the [lecture 1 slides](http://www.andrew.cmu.edu/user/achoulde/94842/lectures/lecture01/lecture01-94842-Rpres.html#/46).  
+
+
+###Importing data
+
+- Start with survey results from "Homework 0"
+
+- To import tabular data into R, we use the **`read.table()`** command
+
+```{r}
+survey <- read.table("http://www.andrew.cmu.edu/user/achoulde/94842/data/survey_data.csv", header=TRUE, sep=",") 
+```
+
+- Let's parse this command one component at a time 
+  - The data is in a file called `survey_data.csv`, which is an online file 
+  - The file contains a `header` as its first row
+  - The csv format means that the data is comma-separated, so `sep=","`
+
+- Could've also used `read.csv()`, which is just `read.table()` with the preset `sep=","`
+
+###Exploring the data
+- R imports data into a **`data.frame`** object
+```{r}
+class(survey)
+```
+
+- To view the first few rows of the data, use **`head()`**
+```{r}
+head(survey, 3)
+```
+
+- `head(data.frame, n)` returns the first `n` rows of the data frame
+
+- In the Console, you can also use `View(survey)` to get a spreadsheet view
+
+###Simple summary
+- Use the `str()` function to get a simple summary of your data set
+
+```{r}
+str(survey)
+```
+<br>
+
+- This says that TVhours is a numeric variable, while all the rest are factors (categorical)
+
+###Another simple summary
+
+```{r}
+summary(survey)
+```
+
+###Data frame basics
+
+- We will talk more about lists and data frames next week, so only give an intro here
+
+- To see what an R object is made up of, you can use `attributes()`
+
+```{r}
+attributes(survey)
+```
+
+> An R **data frame** is a *list* whose columns you can refer to by *name* or *index*
+
+###Data frame dimensions
+- We can use `nrow()` and `ncol` to determine the number of survey responses and the number of survey questions
+```{r}
+nrow(survey) # Number of rows (responses)
+ncol(survey) # Number of columns (questions)
+```
+- When writing reports, you will often want to say how large your sample size was
+- To do this *inline*, use the syntax:
+```{r, eval=FALSE}
+`r nrow(survey)`
+```
+- This allows us to write "`r nrow(survey)` students responded to the survey", and have the number displayed
+  automatically change when `nrow(survey)` changes.
+  
+###Inline code chunks example
+
+- Here's a more complex example of inline code use.
+
+```{r, eval=FALSE}
+We collected data on `r ncol(survey)` survey questions from `r nrow(survey)` respondents.  Respondents represented `r length(unique(survey[["Program"]]))` CMU programs.  `r sum(survey[["Program"]] == "PPM")` of the repondents were from PPM.
+```
+
+- Which results in
+
+> We collected data on `r ncol(survey)` survey questions from `r nrow(survey)` respondents.  Respondents represented `r length(unique(survey[["Program"]]))` CMU programs.  `r sum(survey[["Program"]] == "PPM")` of the repondents were from PPM.
+
+<br>
+- **IMPORTANT**: You are expected to use inline code chunks instead of copying and pasting output whenever possible.
+
+###Indexing data frames
+
+- There are many different ways of indexing the same piece of a data frame
+  - Each vector below contains `r nrow(survey)` entries.  For display purposes, the settings have been adjusted so that only the first 22 are shown below
+```{r, eval = FALSE}
+survey[["Program"]]  # "Program" element
+```
+```{r, echo = FALSE}
+head(survey[["Program"]], 22)
+```
+
+```{r, eval = FALSE}
+survey$Program # "Program" element
+```
+```{r, echo = FALSE}
+head(survey$Program, 22) # "Program" element
+```
+
+```{r, eval = FALSE}
+survey[,1] # Data from 1st column
+```
+```{r, echo = FALSE}
+head(survey[,1], 22) # "Program" element
+```
+
+###More indexing
+- Note that single brackets and double brackets have different effects
+```{r, eval = FALSE}
+survey[["Program"]]  # Returns the Program column as a vector
+```
+```{r, echo = FALSE}
+head(survey[["Program"]], 22)
+```
+```{r}
+survey["Program"] # sub-data-frame containing only "Program"
+```
+
+
+###Bar plot (categorical data)
+<center>
+```{r, eval = FALSE}
+plot(survey[["Program"]])
+```
+```{r, fig.width=14, fig.height=10, echo = FALSE}
+plot(survey[["Program"]],
+      cex.lab = 3.5, cex.axis = 3.5, cex.main = 3.5, cex.names = 3.5)
+```
+</center>
+
+###Histogram (continuous data)
+<center>
+```{r, eval = FALSE}
+hist(survey$TVhours, col="lightgray")
+```
+```{r, fig.width=16, fig.height=12, echo = FALSE}
+# This is the code chunk that actually produces the histogram
+# that appears in the slides.  The extra graphical parameters are 
+# necessary due to the adjusted resolution of the new displays
+par(mai = c(1.5,2,2,2))
+
+hist(survey$TVhours, col="lightgray", 
+       cex.lab = 3, cex.axis = 2.5, cex.main = 3.5)
+```
+</center>
+
+###Indexing multiple columns
+
+```{r}
+head(survey[, c(1,5)]) # Data from 1st and 5th columns
+head(survey[c("Program", "Editor")]) # Data from "Program" and "Editor"
+```
+
+###Indexing rows and columns
+- Data frames have two dimensions to index across 
+
+```{r}
+survey[6,] # 6th row
+survey[6,5] # row 6, column 5
+survey[6, "Program"] # Program of 6th survey respondent 
+survey[["Program"]][6]  # Program of 6th survey respondent 
+```
+
+###More indexing
+- In Lab 1, you were introduced to the colon operator `:`
+
+- We can use this operator for indexing
+
+```{r}
+survey[1:3,]  # equivalent to head(survey, 3)
+survey[3:5, c(1,5)] 
+```
+
+###Subsets of data
+
+- We are often interested in learning something a specific subset of the data
+
+```{r, eval = FALSE}
+survey[survey$Program=="MISM", ] # Data from the MISM students
+survey[which(survey$Program=="MISM"), ] # Does the same thing
+```
+
+```{r, echo = FALSE}
+survey[survey$Program=="MISM", ] # Data from the MISM students
+```
+
+###More subset examples
+
+- Let's pull all of the PPM students who have never used R before
+
+```{r}
+survey[survey$Program=="PPM" & survey$Rexperience=="Never used", ]
+```
+
+###Cleaner subsetting
+
+- When the subset conditions get long or messy, it is preferable to use the **`subset()`** function
+
+- Here's an example of selecting the OperatingSystem and TVhours responses from all of the students who are either in PPM or Other and who listed their R experience as "Basic competence".
+
+```{r}
+subset(survey, select=c("OperatingSystem", "TVhours"),  subset=(Program == "PPM" | Program == "Other") & Rexperience == "Basic competence")
+```
+
+###Splitting a long function call
+
+- As your function calls get longer and more complicated, you may find it useful to split them over multiple lines
+
+- Here's one way to rewrite the previous line
+
+```{r}
+subset(survey, 
+       select = c("OperatingSystem", "TVhours"),  
+       subset = (Program == "PPM" | Program == "Other") & 
+                (Rexperience == "Basic competence")
+       )
+```
+
+###Some simple calculations
+
+```{r}
+mean(survey$TVhours[survey$Program == "PPM"]) # Average time PPM's spent watching TV
+mean(survey$TVhours[survey$Program == "MISM"]) # Average time MISM's spent watching TV 
+mean(survey$TVhours[survey$Program == "Other"]) # Average time "Others" spent watching TV
+```
+
+- Later on we'll learn a better way of doing these types of calculations by using the **aggregate()** function.
+
+###Defining variables
+
+- If we wanted to focus on a particular column of the data frame, we could always define it as a new variable
+
+```{r}
+tv.hours <- survey$TVhours  # Vector of TVhours watched
+mean(tv.hours)              # Average time spent watching TV
+sd(tv.hours)                # Standard deviation of TV watching time
+```
+
+```{r, eval = FALSE}
+tv.hours >= 5         # (Settings adjusted to print first 40 elements)
+```
+```{r, echo = FALSE}
+head(tv.hours >= 5, 40)
+```
+
+```{r}
+sum(tv.hours >= 5)   # How many people watched 5 or more hours of TV?
+```
+
+###R coding style
+
+- Coding style (and code commenting) will become increasingly more important as we get into more advanced and involved programming tasks
+
+- A few R "style guides" exist:
+    - [Google's](https://google.github.io/styleguide/Rguide.xml)
+    - [Hadley Wickham's](http://r-pkgs.had.co.nz/style.html)
+
+- Borrowing Hadley Wickham's words:
+> You don’t have to use my style, but you really should use a **consistent** style.
+
+###R style recommendations
+
+- [Hadley Wickham's](http://r-pkgs.had.co.nz/style.html) guide is short and easy to follow
+
+
+- We'll revisit the question of coding style several times over the course of the class
+
+###Enforced style: Assignment operator
+
+**Assignment operator**.  USE **`<-`**
+
+```{r, eval=FALSE}
+student.names <- c("Eric", "Hao", "Jennifer")  # Good
+student.names = c("Eric", "Hao", "Jennifer") # Bad
+```
+
+- Note: When specifying function arguments, only `=` is valid
+
+```{r, eval=FALSE}
+sort(tv.hours, decreasing=TRUE) # Good
+sort(tv.hours, decreasing<-TRUE) # Bad!!
+```
+
+###Enforced style: Spacing
+
+- Binary operators should have spaces around them
+
+- Commas should have a space after, but not before (just like in writing)
+
+```{r, eval=FALSE}
+3 * 4 # Good
+3*4 # Bad
+which(student.names == "Eric") # Good
+which(student.names=="Eric") # Bad
+```
+
+- For specifying arguments, spacing around `=` is optional
+
+```{r, eval=FALSE}
+sort(tv.hours, decreasing=TRUE) # Accepted
+sort(tv.hours, decreasing = FALSE) # Accepted
+```
+
+###Enforced style: Variable names
+
+- To make code easy to read, debug, and maintain, you should use **concise** but **descriptive** variable names
+
+- Terms in variable names should be separated by `_` or `.`
+
+```{r, eval=FALSE}
+# Accepted
+day_one   day.one   day_1   day.1   day1
+
+# Bad
+d1   DayOne   dayone   
+
+# Can be made more concise:
+first.day.of.the.month
+```
+
+- Avoid using variable names that are already pre-defined in R
+```{r, eval=FALSE}
+# EXTREMELY bad:
+c   T   pi   sum   mean   
+```
+ 
+###Assignments
+
+- **Homework 1** is posted
+  - **Due: Thursday, January 26, 1:20pm**
+  - Submit your .Rmd file on Blackboard
+  - Course website contains grading rubric
+
+- **Lab 2** is now available
+  - Submit Lab 2 on Blackboard by **11:59pm tonight**
+  - Remember: To earn a participation point for today's class, you must submit the lab
