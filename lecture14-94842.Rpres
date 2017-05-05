@@ -1,0 +1,166 @@
+<style>
+  .reveal pre {
+    font-size: 18pt;
+  }
+  .reveal section p {
+    font-size: 38pt;
+  }
+  .reveal div {
+    font-size: 34pt;
+  }
+  .reveal h3 {
+    color: #484848;
+    font-weight: 150%;
+  }
+  
+  .section .reveal h1 {
+    font-size: 72pt;
+  }
+  .section .reveal p {
+    font-size: 48pt;
+    }
+</style>
+  
+Lecture 14: The End
+====
+author: Prof. Alexandra Chouldechova
+date: March 2, 2017
+font-family: Gill Sans
+autosize: false
+width:1480
+height:720
+
+
+Agenda
+====
+
+- What have we learned?
+
+- Where do you go from here?
+    - Useful packages you should know about
+    - Shiny demo
+
+====
+<center>
+<span style="font-weight:bold; font-size:60pt; color:#503585;">What have we learned?</span>
+</center>
+
+Packages
+====
+- `base`, `stats`
+- `MASS`
+  - Contains a lot of simple data sets
+- `ggplot2`
+  - Awesome graphics
+- `plyr`
+  - Enables simple syntax for split-apply-combine operations
+  - `mapvalues()` is from here
+- `dplyr`
+
+Programming basics
+====
+- Loops, apply/sapply/lapply alternatives
+- Functions
+- If-else statements
+
+Tabular summaries
+====
+- `table()`
+- `tapply()`
+- `aggregate()`
+- `plyr` functions
+- `dplyr::summarise()` 
+
+Graphical summaries
+==== 
+<br><br>
+<center>
+<span style="font-weight:bold; font-size:144pt; color:#503585;">ggplot2</span>
+</center>
+  
+Statistics: Quantitative outcomes
+====
+- t-tests
+  - Does the mean of `y` differ between 2 groups?
+- $k$-way ANOVA (analysis of variance)
+  - Does the mean of `y` differ across various combinations of $k$ factors?
+- linear regression
+  - (How) does the mean of `y` differ across various covariates?
+  - Interpreting coefficients of categorical variables
+  - Interpreting interaction terms
+  - Using `anova()` to compare 2 nested models
+
+Statistics: Binary outcomes
+====
+- odds ratios
+- fisher test, chi-squared test
+  - (2 x 2 tables) Is smoking associated with lung cancer?
+  - (j x k tables) Is there an association between political party affiliation and gender?
+- logistic regression
+  - how to fit it with the `glm()` command.
+
+Data challenges
+====
+- Missing values
+- Corrupted data
+- Collinearity
+  - `pairs()` and `GGally::ggpairs()` plots
+- Regression diagnostics
+
+====
+<center>
+<span style="font-weight:bold; font-size:60pt; color:#503585;">Where do we go from here?</span>
+</center>
+
+Data import/export
+====
+
+[foreign](http://www.rdocumentation.org/packages/foreign) - Read Data Stored by Minitab, S, SAS, SPSS, Stata, Systat, Weka, dBase, ...
+
+[xlsx](https://cran.rstudio.com/web/packages/xlsx/) - Read/write Excel data
+
+[RSQLite](http://www.rdocumentation.org/packages/RSQLite) - SQLite Interface for R
+
+[RMySQL](http://www.r-bloggers.com/mysql-and-r/) - MySQL Inferface for R
+
+
+
+Data summarization and manipulation
+====
+
+[tidyr](http://blog.rstudio.org/2014/07/22/introducing-tidyr/) - Tools for reshaping your data into "tidy" formatting
+
+[R for Data Science](http://r4ds.had.co.nz/) - New book by Garrett Grolemund and Hadley Wickham, available for **free** online.  
+  - Introduces the "tidyverse" set of R pacakges and workflows 
+  
+The handy [Data wrangling cheatsheet](https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf) provides a quick reference to the various `dplyr` and `tidyr` functions.
+
+Interfacing R with other languages
+====
+
+[Rcpp](http://dirk.eddelbuettel.com/code/rcpp.html) -  Call C++ functions from R.
+
+[RPython](https://rpython.readthedocs.org/en/latest/) - Call Python functions from R.
+
+_R Notebooks make it even easier to interface with Python, C++, SQL, and bash_
+
+Visualization, interactive graphics
+====
+
+[shiny](http://shiny.rstudio.com/) - A web application framework for R
+
+[ggvis](http://ggvis.rstudio.com/) - Interactive web-based graphics
+
+[plotly](https://plot.ly/r/) - Make ggplots interactive
+
+[htmlwidgets](http://www.htmlwidgets.org) - "Bring the best of JavaScript data visualization to R"
+
+Todo
+====
+
+- Course evaluations
+  - I really appreciate your feedback
+  - Evaluations can be submitted anytime between now and the weekend.
+
+- Final project
+    - Now due at **Wednesday, March 8, 5:30pm**

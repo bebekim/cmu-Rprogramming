@@ -1,0 +1,345 @@
+---
+title: Lecture 12 - More plyr, logistic regression
+author: Prof. Alexandra Chouldechova
+date: February 23, 2017
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+---
+
+```{r}
+library(ggplot2)
+library(plyr)
+
+
+gapminder <- read.delim("https://www.andrew.cmu.edu/user/achoulde/94842/data/gapminder_five_year.txt") # Load data
+```
+
+
+#### Example (more involved): Fitting a linear model for each country
+
+We're now going to go through an example where we get a slope and intercept for regressing `lifeExp` on year.
+
+##### (1) Build a function
+
+Let's start by building our function for a single country.
+
+```{r, fig.align='center', fig.height=4, fig.width=5}
+country.name <- "Ireland"  # Pick a country
+country.name
+gapminder.sub <- subset(gapminder, country == country.name)  # Pull data for this country
+gapminder.sub
+
+# Scatterplot of life exp vs year
+qplot(year, lifeExp, data = gapminder.sub, main = paste("Life expectancy in", country.name)) 
+```
+
+Now let's fit a regression.
+
+```{r}
+options(scipen = 4)
+life.exp.lm <- lm(lifeExp ~ year, data = gapminder.sub) # Fit model
+summary(life.exp.lm) # Get summary print-out for model
+```
+
+The intercept in this case corresponds to the expected life expectancy in the year 0 A.D.  This number makes no sense, because we're essentially taking data from 1952 - 2007 and linearly extrapolating it back nearly 2000 years.  
+
+A better thing to do is to shift the year variable to measure number of years since 1952.  Here's how we do this.
+
+```{r}
+year.min <- min(gapminder$year)  # Earliest year in the data set
+year.min
+# Fit a linear model with year replaced by year - year.min
+life.exp.lm <- lm(lifeExp ~ I(year - year.min), data = gapminder.sub)
+
+gapminder.sub[1,]
+summary(life.exp.lm)
+```
+
+This is much better!  The slope hasn't changed (it shouldn't), but the intercept is now the life expectancy predicted by the linear fit for 1952.  This is within our range of observations, and so the prediction is not absurd.
+
+Now we can pull the coefficients vector:
+
+```{r}
+life.exp.lm$coef
+coef(life.exp.lm)
+```
+
+Let's put this all together into a function
+
+```{r}
+# Function returns slope and intercept from regressing lifeExp on year - year.min
+getCoef <- function(df) {
+  coefs <- lm(lifeExp ~ I(year - year.min), data = df)$coef
+  names(coefs) <- c("intercept", "slope")
+  coefs
+}
+
+getCoef(gapminder.sub)
+```
+
+##### (2) ddply the function
+
+```{r}
+ddply(gapminder, ~ country, getCoef)
+```
+
+#### Another approach: dlply + ldply = ddply
+
+Another approach you might want to take is to store each lm fit in an intermediate list that you can use later.  
+
+##### Step (1): Get a list of lm fits, one for each country
+
+To do this, we use the `dlply` function, which takes a data frame and outputs a list (in this case, a list of `lm` fits).
+
+```{r}
+lm.list <- dlply(gapminder, ~ country, 
+                 function(df) lm(lifeExp ~ I(year - year.min), data = df))
+```
+
+```{r}
+# First element is the linear model fit for the first country
+names(lm.list)
+lm.list[[1]]
+summary(lm.list[["Ireland"]])
+```
+
+##### Step (2): Apply appropriate function to each lm fit
+
+Now we have a list of linear models that we can call `ldply()` on.  How do we get coefficients out of a linear model?  Here's one approach
+
+```{r}
+coefs <- coef(lm.list[["Ireland"]])  # Use the coef() function, same effect as lm.fit$coef
+coefs
+names(coefs) <- c("intercept", "slope")
+coefs
+```
+
+Turning this into a function:
+
+```{r}
+# Input: lm object x, the output of a univariate regression 
+# Output: vector of length 2, giving slope and intercept
+getCoefsLM <- function(x) {
+  coefs <- coef(x)
+  names(coefs) <- c("intercept", "slope")
+  coefs
+}
+
+# Confirm that it does the same thing as our code above
+getCoefsLM(lm.list[["Ireland"]])
+```
+
+Here's the `ldply` call that takes the list of lm fits and outputs a table giving the intercept and slope for each country.
+
+```{r}
+ldply(lm.list, getCoefsLM)
+```
+
+#### What can we learn from this output?
+
+Let's summarize our findings by creating a bar chart for the intercept and slope, with the bars colored by continent.  We'll do this in ggplot.
+
+```{r}
+# Coefficients summary data frame
+summary.coef <- ddply(gapminder, ~ country, getCoef)
+# data frame showing continent of each country
+summary.continent <- ddply(gapminder, ~ country, summarize, continent = unique(continent))
+summary.continent
+# Merge data together
+summary.merge <- merge(summary.coef, summary.continent, by = "country")
+# Here are the first few lines
+summary.merge
+```
+
+#### Plotting intercepts coloured by continent
+
+This code is analogous to that presented at the end of Lecture 6
+
+```{r, fig.width = 18, warning = FALSE}
+# Reorder the countries according to intercept
+summary.intercept <- transform(summary.merge, country = reorder(country, intercept))
+# Construct ggplot object, will fill color determined by continent
+intercept.fig <- ggplot(data = summary.intercept, mapping = aes(x = country, y = intercept, fill = continent))
+# Construct bar chart
+intercept.fig + geom_bar(stat = "identity") +
+               theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+```
+
+#### Plotting slopes coloured by continent
+
+```{r, fig.width = 18, warning = FALSE}
+# Reorder the countries according to intercept
+summary.slope <- transform(summary.merge, country = reorder(country, slope))
+# Construct ggplot object, will fill color determined by continent
+slope.fig <- ggplot(data = summary.slope, mapping = aes(x = country, y = slope, fill = continent))
+# Construct bar chart
+slope.fig + geom_bar(stat = "identity") +
+               theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+```
+
+
+These are very interesting plots.  What can you tell from looking at them?
+
+#### Looking at per capita GDP by year
+
+Let's start by looking at some plots of how GDP per capita varied by year 
+
+```{r, fig.height = 20, fig.width = 15, cache = TRUE}
+# Use qplot from ggplot2 to generate plots
+qplot(year, gdpPercap, facets = ~ country, data = gapminder, colour = continent) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+What if we want to rearrange the plots by continent?   This can be done by changing the order of the `country` level.  
+
+```{r, fig.height = 20, fig.width = 15, cache = TRUE}
+# First step: reorder the countries by continent
+# Produce a data frame of just country and continent
+country.df <- ddply(gapminder, ~ country, 
+                    function(df) data.frame(continent.id = df$continent[1]))
+# Print out first few lines
+country.df
+# Use arrange() to sort table by continent
+country.ordered <- arrange(country.df, continent.id)
+# Print out first few lines
+country.ordered
+# Reorder levels of country:
+gapminder.ordered <- transform(gapminder, country = factor(country, levels = country.ordered$country))
+# Let's make sure that things are now ordered correctly...
+levels(gapminder.ordered$country)
+
+# Use qplot from ggplot2 to generate plots
+qplot(year, gdpPercap, facets = ~ country, data = gapminder.ordered, colour = continent) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + stat_smooth(method = "lm") 
+```
+
+### Logistic regression
+
+
+You probably saw linear regression at some point in your statistics education.  You may not have seen **logistic regression**, which is used when the outcome is binary.  
+
+For this example we'll use an Income data set where the goal is to predict whether an individual's income is **under 50k** or **over 50k**.
+
+```{r, cache=TRUE}
+# Import data file
+income <- read.csv("http://www.andrew.cmu.edu/user/achoulde/94842/data/income_data.txt", header=FALSE)
+
+# Give variables names
+colnames(income) <- c("age", "workclass", "fnlwgt", "education", "education.years", "marital.status", "occupation", "relationship", "race", "sex", "capital.gain", "capital.loss", "hours.per.week", "native.country", "income.bracket")
+
+# Create a 0-1 indicator of whether income is higher than 50K
+income <- transform(income, high.income = as.numeric(income.bracket == ">50K"))
+# Data dimensions
+dim(income)
+# Data summary
+summary(income)
+```
+
+We'll focus on the subpopulation of individuals who were born in the US. 
+
+```{r}
+income.us <- subset(income, 
+                    subset = native.country == "United-States")
+dim(income.us)
+```
+
+We have some categorical predictors in the data, and the default in R is to output coefficients that compare to the level that's coded 1.  Here are the default baseline levels:
+
+```{r}
+baselines <- sapply(income.us, function(x){ifelse(is.factor(x), levels(x)[1], NA)})
+baselines[!is.na(baselines)]
+```
+
+We'll want to use `relevel` to set a reasonable base level as the reference.  We'll relevel all the factors so that the comparison is being made to the most frequently occurring category.
+
+```{r}
+# If x is a factor, this function sets the first level to be the most frequent category
+# If x is not a factor, this function returns x unchanged
+relevelToMostFrequent <- function(x) {
+  if (is.factor(x)) {
+    # Determine most frequent category
+    most.freq.level <- levels(x)[which.max(table(x))]
+    # Relevel to set most frequent category as the baseline
+    relevel(x, ref = most.freq.level)
+  } else {
+    x
+  }
+}
+# Re-level the data
+income.us.releveled <- as.data.frame(lapply(income.us, FUN = relevelToMostFrequent))
+sapply(income.us.releveled, function(x){ifelse(is.factor(x), levels(x)[1], NA)})
+levels(income.us.releveled$race)
+```
+
+#### Running a logistic regression.
+
+To run a logistic regression, you need to use the `glm()` function (Generalized Linear Model), and specify `family = binomial()`.
+
+```{r}
+income.glm <- glm(high.income ~ age + workclass + education.years + marital.status*sex + race + hours.per.week, 
+                  family = binomial(), 
+                  data = income.us.releveled)
+```
+
+Let's see what we get
+
+```{r}
+summary(income.glm)
+coef.table <- summary(income.glm)$coef
+coef.table
+```
+
+That's not very fun to try to read... let's output to a nicer table format so that we can look at that instead.
+
+```{r, results = 'asis'}
+library(knitr)  # Will use to display output more nicely
+kable(coef.table, digits=c(3, 3, 2, 4), format = "markdown")
+```
+
+For interpreting the coefficients, we should remind ourselves what the baselines are.
+
+```{r}
+# The lapply() call returns the most frequently occuring category for each variable.  
+# If the variable is not a factor, NULL is returned.
+# The unlist() command removes all the NULL valued terms and returns
+# just the most frequently occuring category for each of the factor variables.
+unlist(lapply(income.us.releveled, FUN = function(x) { levels(x)[which.max(table(x))] }))
+```
+
+
+#### Interpreting coefficients of logistic regression
+
+A while back we talked a bit about odds ratios.  
+
+Recall that given an outcome whose probability of occurrence is $p$, the **odds of the outcome** are defined as
+
+$$ \frac{p}{1-p} $$
+
+The coefficients in a logistic regression model are all log-odds-ratios.  I'll explain what this means with some examples.  Formally, the model can be written as:
+
+$$ \log\left(\frac{p}{1 - p}\right) = \beta_0 + \beta_1 x_1 + \dots + \beta_p x_p $$
+
+In our case, $p$ is the probability of the individual earning 50K or more.  
+
+In logistic regression, "log-odds" serves the same role as does "expected outcome" in linear regression.  E.g., Instead of saying "for every unit increase in $x_1$, the expected outcome increases by $\beta_1$ units", in a logistic regression you say:
+
+> For every unit increase in $x_1$, the log-odds of success increase by $\beta_1$.
+
+Let's now go back to our fitted model.  The coefficient of education is `r round(income.glm$coef["education.years"], 3)`.  This means that, all else in the model held constant, for every 1 year increase in education level, the log-odds of having an income higher than 50k increase by `r round(income.glm$coef["education.years"], 3)`.  
+
+This may be hard to interpret, so we can exponentiate the coefficient to get something nicer.  Exponentiating gives: `r round(exp(income.glm$coef["education.years"]), 3)`. 
+
+> **Interpretation:** For every year of additional education, the odds of having an income over 50k increase by a factor of `r round(exp(income.glm$coef["education.years"]), 3)`.
+
+
+For categorical variables, the interpretation is relative to the given baseline.  Let's look at the effect of marital status on the chances of having a high income.
+
+```{r}
+divorced.coef <- round(income.glm$coef["marital.statusDivorced"], 3)
+divorced.coef
+```
+
+The coefficient is `r divorced.coef`, and the baseline category is "married and living with spouse".  There is an interaction term between sex and marital status in the model, so the interpretation of the main divorced coeffcient is for men.  This means that the log-odds of having an income >50K are `r abs(divorced.coef)` lower for divorced men than for married men.  (Exponentiating). Equivalently, the odds of men earning >50K when divorced are `r round(exp(divorced.coef), 3)` times the odds of earning >50K per year when married.  
+

@@ -1,0 +1,110 @@
+<style>
+  .reveal pre {
+    font-size: 18pt;
+  }
+  .reveal section p {
+    font-size: 38pt;
+  }
+  .reveal div {
+    font-size: 34pt;
+  }
+  .reveal h3 {
+    color: #484848;
+    font-weight: 150%;
+  }
+  
+  .section .reveal h1 {
+    font-size: 72pt;
+  }
+  .section .reveal p {
+    font-size: 48pt;
+    }
+</style>
+
+Final project: missing data & topcoded values
+====
+author: Prof. Chouldechova
+date: 
+font-family: Gill Sans
+autosize: false
+width:1920
+height:1080
+
+
+
+
+Final project: missing data
+====
+
+There is a fair bit of missingness in the data set.  There are several approaches to dealing with missing data:
+
+1. **Exclude**
+  - You can omit observations with missing values (e.g., remove any rows that contain missing data)
+  
+2. **Impute**
+  - R has various packages (Amelia, mice, mi, `impute()` function from Hmisc, etc.) that can help with imputing missing values.  
+  
+3. Think carefully about whether certain kinds of missingness are **informative**
+
+Final project: missing data
+====
+
+The downsides of the **Impute** approach:
+
+  - Imputation methods often rely on fairly **strong assumptions** concerning the process governing the appearance of missing values (assumptions such as MAR, missing at random; or MCAR, missing completely at random).  
+  
+  - This is **a lot of hassle** to go through unless you want practice imputing values
+  
+Final project: missing data
+====
+
+Why the **think carefully** approach can be a good one:
+
+  - For factor variables, you can treat missing values as just another factor level. Sometimes **missingness can be informative (predictive)**, leading to a significant coefficient for the missing level. 
+  
+ - E.g., Just now we ran a logistic regression in which we used `?` as one of the levels of the `workingclass` variable to indicate individuals whose working class is unknown.  Having `workingclass = ?` turned out to be strong associated with earning under 50k a year.
+  
+  - For numeric variables, there's not much you can do.  Just recode negative values to `NA`. 
+  
+
+  
+Final project: missing data 
+====
+
+**My recommendation**
+
+1. Start by **thinking carefully** about missing values
+
+2. If nothing interesting turns up, go ahead and **exclude** them (code as `NA`, proceed accordingly)
+
+- **Warning**: Trying to impute can consume a lot of time 
+    - Not guaranteed to produce better results than what you'd have if you just excluded all observations with missing values.
+    
+    
+Final project: topcoded outcome variable
+====
+
+- The income variable that you have available is **topcoded**.
+
+- For the top 2% of earners, you don't observe their actual income.
+
+- Instead, their income is recorded as the average of the top 2% of incomes.
+
+- Standard regression applied to data with a topcoded outcome is  **inconsistent**.  
+    - i.e., even if you had infinite data, your coefficient estimates won't converge to the "true" coefficients.  
+
+Final project: topcoded outcome variable
+====
+
+1. **Tobit regression** (censored regression).  
+    - We didn't talk about this method in class
+    - It's not too difficult to understand if you already understand linear regression.  
+    - [A tutorial can be found here](http://www.ats.ucla.edu/stat/r/dae/tobit.htm). 
+
+2. Try fitting the regression models / running hypothesis tests two ways
+    - **First way**: include the topcoded observations
+    - **Second way**: exclude all observations with topcoded outcomes
+    - If your estimates change a lot, then you probably don't want to use the topcoded observations 
+    - If you go this route, be sure to explain what omiting the high earning individuals means for the scope of your conclusions.
+    
+**My recommendation**: Take approach (2), unless you want practice with tobit regression.

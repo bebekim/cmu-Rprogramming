@@ -1,0 +1,197 @@
+
+---
+title: "Lecture 9: Final Project Demo"
+author: "Prof. Alexandra Chouldechova"
+date: ''
+output: html_document
+---
+
+#### Importing the data
+
+```{r}
+# Import starting data
+nlsy <- read.csv("http://www.andrew.cmu.edu/user/achoulde/94842/final_project/nlsy79/nlsy79_income.csv", header=TRUE)
+```
+
+#### Variables present in the base data set
+
+To learn more about the data, you can have a look at the [variable names summary file](http://www.andrew.cmu.edu/user/achoulde/94842/final_project/nlsy79/nlsy79_var_descriptions.txt) and the longer form [variable description file](http://www.andrew.cmu.edu/user/achoulde/94842/final_project/nlsy79/nlsy79_var_info.txt).
+
+
+Here's how to rename all the variables to the Question Name abbreviation.  **You will want to change the names to be even more descriptive**, but this is a start.
+
+```{r}
+# Change column names to question name abbreviations (you will want to change these further)
+colnames(nlsy) <- c("VERSION_R25_2012",
+    "CASEID_1979",
+    "FAM-2A_1979",
+    "FAM-POB_1979",
+    "FAM-3_1979",
+    "FAM-3A_1979",
+    "FAM-RES_1979",
+    "FAM-6_1979",
+    "R_REL-1_COL_1979",
+    "SCHOOL-31_1979",
+    "MIL-6_1979",
+    "WOMENS-ROLES_000001_1979",
+    "WOMENS-ROLES_000002_1979",
+    "WOMENS-ROLES_000003_1979",
+    "WOMENS-ROLES_000004_1979",
+    "WOMENS-ROLES_000006_1979",
+    "WOMENS-ROLES_000007_1979",
+    "WOMENS-ROLES_000008_1979",
+    "EXP-OCC_1979",
+    "EXP-9_1979",
+    "race",
+    "gender",
+    "MARSTAT-KEY_1979",
+    "FAMSIZE_1979",
+    "POVSTATUS_1979",
+    "POLICE-1_1980",
+    "POLIC-1C_1980",
+    "POLICE-2_1980",
+    "ALCH-2_1983",
+    "DS-8_1984",
+    "DS-9_1984",
+    "Q13-5_TRUNC_REVISED_1990",
+    "POVSTATUS_1990",
+    "HGCREV90_1990",
+    "JOBSNUM_1990",
+    "NUMCH90_1990",
+    "AGEYCH90_1990",
+    "DS-12_1998",
+    "DS-13_1998",
+    "INDALL-EMP.01_2000",
+    "CPSOCC80.01_2000",
+    "OCCSP-55I_CODE_2000",
+    "Q2-15B_2000",
+    "Q10-2_2000",
+    "Q13-5_TRUNC_REVISED_2000",
+    "FAMSIZE_2000",
+    "TNFI_TRUNC_2000",
+    "POVSTATUS_2000",
+    "MARSTAT-COL_2000",
+    "MARSTAT-KEY_2000",
+    "MO1M1B_XRND",
+    "Q2-10B~Y_2012",
+    "INDALL-EMP.01_2012",
+    "OCCALL-EMP.01_2012",
+    "OCCSP-55I_CODE_2012",
+    "Q2-15A_2012",
+    "Q12-6_2012",
+    "income",
+    "Q13-5_SR000001_2012",
+    "Q13-5_SR000002_2012",
+    "Q13-18_TRUNC_2012",
+    "Q13-18_SR000001_TRUNC_2012",
+    "FAMSIZE_2012",
+    "REGION_2012",
+    "HGC_2012",
+    "URBAN-RURAL_2012",
+    "JOBSNUM_2012")
+
+### Set all negative values to NA.  
+### THIS IS DONE ONLY FOR ILLUSTRATIVE PURPOSES
+### DO NOT TAKE THIS APPROACH WITHOUT CAREFUL JUSTIFICATION
+nlsy[nlsy < 0]  <- NA
+```
+
+#### A note on missing values
+
+Here's an example of what the variable description files look like
+
+```
+R13954.00    [DS-9]                                         Survey Year: 1984
+  PRIMARY VARIABLE
+
+ 
+             DRUG USE - AGE WHEN 1ST USED MARIJUANA
+ 
+ORIGINAL QUESTION NAME: Q5332
+ 
+HOW OLD WERE YOU THEN?
+ 
+ACTUAL AGE
+ 
+      25           0 TO 9: < 10
+      15          10
+      35          11
+      91          12
+     216          13
+     251          14
+     367          15
+     384          16
+     290          17
+     227          18
+      96          19
+      60          20
+      30          21
+      24          22
+       8          23
+       7          24
+       2          25
+       3          26 TO 99999: 26+
+  -------
+    2131
+ 
+Refusal(-1)            0
+Don't Know(-2)        69
+Invalid Skip(-3)      33
+TOTAL =========>    2233   VALID SKIP(-4)    9836     NON-INTERVIEW(-5)     617
+ 
+Min:              5        Max:             26        Mean:               15.71
+ 
+Lead In: R13953.00[Default]
+Default Next Question: R13955.00
+```
+
+This description says that the numbers -1, -2, -4 and -5 all have a special meaning for this variable.  They denote different types of missingness.  You can recode all of these to `NA`, but you should also think about whether the different missigness indicators are in some way informative.  (i.e., if someone refuses to answer questions related to drug use, might this inform us about their income?) 
+
+#### Getting to know our two main variables.
+
+In the previous chunk of code we have appropriately renamed the variables corresponding to `gender`, `race` and `income` (as reported on the 2012 survey).  Let's have a quick look at what we're working with.
+
+```{r}
+table(nlsy$gender)
+```
+
+The default coding is Male = 1, Female = 2.  You'll want to do some data manipulations to change the numeric values to something more interpretable.  **Note:** `gender` starts out as a numeric variable.  You'll want to fix this.
+
+```{r}
+library(ggplot2)
+library(scales)
+
+summary(nlsy$income)
+
+# Histogram
+qplot(nlsy$income)
+```
+
+The income distributing is right-skewed like one might expect.  However, as indicated in the question description, the income variable is *topcoded* at the 2% level.  More precisely,
+
+```{r}
+with(nlsy, sum(income == max(income)))
+```
+
+`r with(nlsy, sum(income == max(income)))` of the incomes are topcoded to the maximum value of `max(nlsy$income))`, which is the average value of the top `r with(nlsy, sum(income == max(income)))` earners.    You will want to think about how  to deal with this in your analysis.
+
+
+Let's do two versions of a simple plot
+
+```{r}
+qplot(x = as.factor(plyr::mapvalues(gender, c(1, 2), c("Male", "Female"))), 
+      y = income, geom = "boxplot", data = nlsy, 
+      xlab = "Sex", ylab = "Income") +
+  scale_y_continuous(labels = comma, breaks = c(1000, 10000, 25000, 50000, 75000, 100000, 150000))
+```
+
+```{r}
+# Box plot of 2012 income, with y-axis shown on logarithmic scale
+qplot(x = as.factor(plyr::mapvalues(gender, c(1, 2), c("Male", "Female"))), 
+      y = income, geom = "boxplot", data = nlsy, 
+      xlab = "Sex", ylab = "Income") +
+  scale_y_continuous(trans = "log", labels = comma,
+                     breaks = c(1000, 10000, 25000, 50000, 75000, 100000, 150000))
+```
+
+We got a warning saying `## Warning: Removed 7411 rows containing non-finite values (stat_boxplot).`... this probably has to do with some of the incomes being exactly 0 or missing.  Remember that `log()` can only be calculated for positive numbers.  Be careful with these kinds of things! 
